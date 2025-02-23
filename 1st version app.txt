@@ -1,0 +1,121 @@
+import { useState } from "react";
+import axios from "axios";
+import SunCalc from "suncalc";
+
+function App() {
+  const [page, setPage] = useState("input");
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [location, setLocation] = useState(null);
+  const [place, setPlace] = useState(null);
+  const [times, setTimes] = useState({});
+  const [error, setError] = useState(null);
+  const [arunaOffset, setArunaOffset] = useState(40);
+
+  const years = Array.from({ length: 20 }, (_, i) => new Date().getFullYear() - 10 + i);
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  const getLocation = () => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const latitude = position.coords.latitude.toFixed(2);
+          const longitude = position.coords.longitude.toFixed(2);
+
+          setLocation({ latitude, longitude });
+          setError(null);
+
+          try {
+            const response = await axios.get(
+              `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+            );
+            const { city, town, village, country } = response.data.address || {};
+            setPlace({ name: city || town || village || "Unknown", country: country || "Unknown" });
+          } catch {
+            setError("Failed to get location name.");
+          }
+        },
+        (err) => setError(err.message)
+      );
+    } else {
+      setError("Geolocation is not supported by this browser.");
+    }
+  };
+
+  const getSunTimesForYear = () => {
+    if (!location) return;
+    const { latitude, longitude } = location;
+    const sunTimes = {};
+    for (let month = 0; month < 12; month++) {
+      sunTimes[month] = {};
+      for (let day = 1; day <= 31; day++) {
+        const date = new Date(year, month, day);
+        if (date.getMonth() !== month) continue;
+        const times = SunCalc.getTimes(date, latitude, longitude);
+        const arunaTime = new Date(times.sunrise.getTime() - arunaOffset * 60000);
+        sunTimes[month][day] = `${arunaTime.getHours()}:${arunaTime.getMinutes().toString().padStart(2, '0')} / ${times.solarNoon.getHours()}:${times.solarNoon.getMinutes().toString().padStart(2, '0')}`;
+      }
+    }
+    setTimes(sunTimes);
+    setPage("table");
+  };
+
+  return (
+    <div style={{ textAlign: "center", padding: "20px" }}>
+      {page === "input" ? (
+        <div>
+          <h1>Solar Calculator 🌞</h1>
+          <p>Select a year and get your location.</p>
+          <label>
+            Select Year:
+            <select value={year} onChange={(e) => setYear(e.target.value)}>
+              {years.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </label>
+          <br /><br />
+          <label>
+            Aruna Offset (minutes):
+            <input type="number" value={arunaOffset} onChange={(e) => setArunaOffset(Number(e.target.value))} />
+          </label>
+          <br /><br />
+          <button onClick={getLocation}>Get My Location</button>
+          {location && (
+            <p>📍 Latitude: {location.latitude}, Longitude: {location.longitude}</p>
+          )}
+          {place && <p>🏙️ {place.name}, {place.country}</p>}
+          {error && <p style={{ color: "red" }}>⚠️ {error}</p>}
+          <br />
+          <button onClick={getSunTimesForYear} disabled={!location}>Show Table</button>
+        </div>
+      ) : (
+        <div>
+          <button onClick={() => setPage("input")}>&larr; Back</button>
+          <h2>Aruna & Solar Noon Times for {year}</h2>
+          <table border="1" style={{ margin: "auto", borderCollapse: "collapse", width: "90%", textAlign: "center" }}>
+            <thead>
+              <tr>
+                <th style={{ padding: "10px" }}>Date</th>
+                {months.map((month, index) => (
+                  <th key={index} style={{ padding: "10px" }}>{month}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[...Array(31).keys()].map((day) => (
+                <tr key={day}>
+                  <td style={{ padding: "10px" }}>{day + 1}</td>
+                  {months.map((_, monthIndex) => (
+                    <td key={monthIndex} style={{ padding: "10px" }}>{times[monthIndex]?.[day + 1] || "-"}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default App;

@@ -1,0 +1,94 @@
+import SunCalc from 'suncalc';
+import { useState, useEffect } from 'react';
+
+const solarYear = 365.2587565;
+const lunarMonth = 29.53058795;
+const myanYZero = 1954168.050623;
+const julianEpoch = new Date(Date.UTC(-4713, 10, 24, 5, 0, 0));
+
+const greg2JulianDay = (date) => Math.floor((date - julianEpoch) / 86400000);
+
+const checkMyanmarYear = (myanmarYear) => {
+    let myanYType = 0;
+    let yd = 0;
+    let y1Watat;
+    let y1Fm;
+    let nd = 0;
+
+    let y2Watat = new CheckWatat(myanmarYear).watat;
+    let y2Fm = new CheckWatat(myanmarYear).fullMoonDay2ndWaso;
+
+    myanYType = y2Watat;
+
+    do {
+        yd++;
+        y1Watat = new CheckWatat(myanmarYear - yd).watat;
+        y1Fm = new CheckWatat(myanmarYear - yd).fullMoonDay2ndWaso;
+    } while (y1Watat === 0 && yd < 3);
+
+    if (myanYType !== 0) {
+        nd = ((Math.round(y2Fm) - Math.round(y1Fm)) % 354);
+        myanYType = Math.floor(nd / 31) + 1;
+
+        if (nd !== 30 && nd !== 31) {
+            return 'Watat Error';
+        }
+    }
+    let tagu1stDay = y1Fm + (354 * yd) - 102;
+    return [tagu1stDay, myanYType];
+};
+
+const jul2Mm = (jdn) => {
+    let jd = Math.round(jdn);
+    let my = Math.floor((jd - 0.5 - myanYZero) / solarYear);
+    let yo = checkMyanmarYear(my);
+    let buddhistYear = my + 1182;
+    let myt = yo[1];
+    let dd = jd - Math.round(yo[0]) + 1;
+    let b = Math.floor(yo[1] / 2);
+    let c = Math.floor(1 / (yo[1] + 1));
+    let myl = 354 + (1 - c) * 30 + b;
+    let mmt = Math.floor((dd - 1) / myl);
+    dd -= mmt * myl;
+    let a = Math.floor((dd + 423) / 512);
+    let mm = Math.floor((dd - b * a + c * a * 30 + 29.26) / 29.544);
+    let e = Math.floor((mm + 12) / 16);
+    let f = Math.floor((mm + 11) / 16);
+    let md = dd - Math.floor(29.544 * mm - 29.26) - b * e + c * f * 30;
+    mm += f * 3 - e * 4;
+    let mml = 30 - (mm % 2);
+    if (mm === 3) mml += b;
+    let mp = Math.floor((md + 1) / 16) + Math.floor(md / 16) + Math.floor(md / mml);
+    let fd = md - 15 * Math.floor(md / 16);
+    let wd = (jd + 2) % 7;
+
+    return {
+        myanmarYear: my,
+        buddhistYear,
+        tagu1stDay: yo[0],
+        yearType: myt,
+        yearLength: myl,
+        month: mm,
+        monthType: mmt,
+        monthLength: mml,
+        monthDay: md,
+        fortnightDay: fd,
+        moonPhase: mp,
+        weekDay: wd
+    };
+};
+
+const checkSpecial = (myanmarMonth, moonPhaseID) => {
+    const specialDays = {
+        '2-1': 'Vesak Day',
+        '3-1': 'Mahasamaya Day',
+        '4-1': 'Dhammacakka Day',
+        '5-1': 'Metta Day',
+        '7-1': 'Abhidhamma Day',
+        '8-1': 'End of Kathina',
+        '12-1': 'Kathina Privilege End'
+    };
+    return specialDays[`${myanmarMonth}-${moonPhaseID}`] || null;
+};
+
+export { greg2JulianDay, jul2Mm, checkSpecial };

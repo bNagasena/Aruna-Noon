@@ -1,0 +1,81 @@
+// Julian Epoch DateTime
+const julianEpoch = new Date(Date.UTC(-4713, 10, 24, 5, 0, 0));
+
+// Convert Gregorian date to Julian Day Number (JDN)
+function greg2JulianDay(date) {
+    return Math.floor((date - julianEpoch) / (1000 * 60 * 60 * 24));
+}
+
+// Convert Julian Day Number (JDN) to Gregorian date
+function jul2Greg(jdn) {
+    const J = jdn + 0.5;
+    const j = Math.floor(J);
+    const f = J - j;
+    const Z = Math.floor(j);
+    const W = Math.floor((Z - 1867216.25) / 36524.25);
+    const X = Math.floor(W / 4);
+    const A = Z + 1 + W - X;
+    const B = A + 1524;
+    const C = Math.floor((B - 122.1) / 365.25);
+    const D = Math.floor(365.25 * C);
+    const E = Math.floor((B - D) / 30.6001);
+    const day = B - D - Math.floor(30.6001 * E) + f;
+    const month = E < 14 ? E - 1 : E - 13;
+    const year = month > 2 ? C - 4716 : C - 4715;
+    return new Date(Date.UTC(year, month - 1, Math.floor(day)));
+}
+
+// Myanmar Calendar Constants
+const solarYear = 365.2587565;
+const lunarMonth = 29.53058795;
+const myanYZero = 1954168.050623;
+
+// Calculate Myanmar Year to Julian Day Number
+function myanY2Jul(myanmarYear) {
+    return solarYear * myanmarYear + myanYZero;
+}
+
+// Check if a Myanmar year is a leap year (Watat)
+function checkMyanmarYear(myanmarYear) {
+    let numMonth = 8;
+    let excessDay = (solarYear * (myanmarYear + 3739)) % lunarMonth;
+    let threshold = ((solarYear / 12) - lunarMonth) * (12 - numMonth);
+    if (excessDay < threshold) excessDay += lunarMonth;
+    let isWatat = excessDay >= (lunarMonth - (solarYear / 12 - lunarMonth) * numMonth) ? 1 : 0;
+    let fullMoonDay2ndWaso = myanY2Jul(myanmarYear) - excessDay + (4.5 * lunarMonth) - 0.5;
+    return { isWatat, fullMoonDay2ndWaso };
+}
+
+// Convert Julian Day Number to Myanmar Date
+function jul2Mm(jdn) {
+    let myanmarYear = Math.floor((jdn - myanYZero) / solarYear);
+    let { isWatat, fullMoonDay2ndWaso } = checkMyanmarYear(myanmarYear);
+    let buddhistYear = myanmarYear + 1182;
+    let dayOffset = jdn - Math.floor(fullMoonDay2ndWaso) + 1;
+    let month = Math.floor((dayOffset + 423) / 512);
+    let monthDay = dayOffset - Math.floor(29.544 * month - 29.26);
+    let moonPhase = (monthDay === 15) ? 1 : (monthDay === 1) ? 3 : (monthDay > 15 ? 2 : 0);
+    return { myanmarYear, buddhistYear, month, monthDay, moonPhase };
+}
+
+// Identify Uposatha Days
+function findUposathaDays(year) {
+    let uposathaDays = [];
+    for (let day = 0; day < 365; day++) {
+        let date = new Date(Date.UTC(year, 0, day + 1));
+        let jdn = greg2JulianDay(date);
+        let { moonPhase } = jul2Mm(jdn);
+        if (moonPhase === 1 || moonPhase === 3) { // Full Moon 🌕 or New Moon 🌑
+            uposathaDays.push({ date, moonPhase });
+        }
+    }
+    return uposathaDays;
+}
+
+// Example Usage
+const year = 2025;
+const uposathaDays = findUposathaDays(year);
+console.log(`Uposatha Days for ${year}:`);
+uposathaDays.forEach(({ date, moonPhase }) => {
+    console.log(`${date.toISOString().split('T')[0]} - Moon Phase: ${moonPhase === 1 ? 'Full Moon' : 'New Moon'}`);
+});
